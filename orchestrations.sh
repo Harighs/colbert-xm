@@ -1,65 +1,74 @@
 #!/bin/bash
 
-# === CONFIGURATION ===
-commands=(
-    "python3 src/script1.py -s 'src/setting.json' --record_number 20 --processing_status 20 --initial_status 20"
-    "python3 src/script2.py -s 'src/setting.json' --record_number 50 --processing_status 10 --initial_status 5"
-    "python3 src/script3.py -s 'src/setting.json' --record_number 100 --processing_status 50 --initial_status 10"
-)
-delays=(0 5 10)
-
-# PID file for supervisor
 pidfile="orchestrations.pid"
 echo $$ > "$pidfile"
 
-# Shutdown flags (0 = continue, 1 = stop next loop)
+# Adjustable delays for staggered starts (in seconds)
+delays=(0 5 10)
+
+# Shutdown flags: 0 = continue; 1 = stop this loop after current iteration
 shutdown_flags=(0 0 0)
 
-# === SIGNAL HANDLERS ===
-trap 'shutdown_flags=(1 1 1); echo "Global shutdown requested (SIGINT)";' SIGINT
-trap 'shutdown_flags=(1 1 1); echo "Global shutdown requested (SIGHUP)";' SIGHUP
-trap 'shutdown_flags[0]=1; echo "Shutdown requested for script 1";' SIGUSR1
-trap 'shutdown_flags[1]=1; echo "Shutdown requested for script 2";' SIGUSR2
-trap 'shutdown_flags[2]=1; echo "Shutdown requested for script 3";' SIGTERM
+# Trap signals for graceful or targeted shutdown
+trap 'shutdown_flags=(1 1 1); echo "[Supervisor] Global shutdown requested (SIGINT)";' SIGINT
+trap 'shutdown_flags=(1 1 1); echo "[Supervisor] Global shutdown requested (SIGHUP)";' SIGHUP
+trap 'shutdown_flags[0]=1; echo "[Supervisor] Shutdown requested for script 1";' SIGUSR1
+trap 'shutdown_flags[1]=1; echo "[Supervisor] Shutdown requested for script 2";' SIGUSR2
+trap 'shutdown_flags[2]=1; echo "[Supervisor] Shutdown requested for script 3";' SIGTERM
 
-# === MAIN FUNCTION TO RUN EACH COMMAND ===
 run_script_loop() {
     local index=$1
-    local cmd="${commands[$index]}"
     local delay="${delays[$index]:-0}"
-    
-    echo "Supervisor starting loop for script $((index+1)) after delay of $delay seconds."
+
+    echo "[Supervisor] Starting loop for script $((index+1)) after ${delay}s delay."
     sleep "$delay"
+
+    local child_pid=0
 
     while true; do
         if [ "${shutdown_flags[$index]}" -eq 1 ]; then
-            echo "[Supervisor] Stop flag set for script $((index+1)). Exiting loop."
+            echo "[Supervisor] Stop flag detected for script $((index+1)). Exiting loop."
+            if [ "$child_pid" -ne 0 ] && kill -0 "$child_pid" 2>/dev/null; then
+                echo "[Supervisor] Killing active child process $child_pid"
+                kill -SIGTERM "$child_pid"
+                wait "$child_pid"
+            fi
             break
         fi
 
-        echo "[Supervisor] Executing: $cmd"
-        eval "$cmd"
-        echo "[Supervisor] Script $((index+1)) finished."
+        # Dynamically load current command from config file
+        cmd=$(sed -n "$((index + 1))p" commands.conf)
+        if [ -z "$cmd" ]; then
+            echo "[Supervisor] No command found for script $((index+1)) in commands.conf, skipping."
+            break
+        fi
 
-        # Check shutdown again after completion
+        echo "[Supervisor] Executing script $((index+1)): $cmd"
+        eval "$cmd" &
+        child_pid=$!
+
+        # Wait for completion or forced shutdown
+        wait "$child_pid"
+        child_pid=0
+
         if [ "${shutdown_flags[$index]}" -eq 1 ]; then
-            echo "[Supervisor] Stop flag set for script $((index+1)) after completion."
+            echo "[Supervisor] Stop flag detected after execution for script $((index+1))."
             break
         fi
 
-        echo "[Supervisor] Restarting script $((index+1)) after 5s pause."
+        echo "[Supervisor] Restarting script $((index+1)) in 5s..."
         sleep 5
     done
 
-    echo "[Supervisor] Graceful exit for script $((index+1)) loop."
+    echo "[Supervisor] Loop ended for script $((index+1))."
 }
 
-# === Start each script loop in parallel ===
-for i in "${!commands[@]}"; do
+# Start all loops in parallel
+for i in {0..2}; do
     run_script_loop "$i" &
 done
 
 wait
 
-echo "[Supervisor] All script loops exited. Cleaning up."
+echo "[Supervisor] All scripts stopped. Cleaning up."
 rm -f "$pidfile"
