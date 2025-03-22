@@ -3,90 +3,93 @@
 pidfile="orchestrations.pid"
 echo $$ > "$pidfile"
 
-# Load CRAWLER_ID from environment (default fallback)
 CRAWLER_ID=${CRAWLER_ID:-"crawler1"}
 echo "[Supervisor] CRAWLER_ID = $CRAWLER_ID"
 
-# Dynamically load commands for this crawler only
-mapfile -t commands < <(grep "^$CRAWLER_ID:" commands.conf | cut -d':' -f2-)
+declare -A loop_pids   # map command string -> loop PID
+declare -a running_cmds=()
 
-if [ ${#commands[@]} -eq 0 ]; then
-    echo "[Supervisor] No commands found for $CRAWLER_ID in commands.conf. Exiting."
-    rm -f "$pidfile"
-    exit 1
-fi
+# Function to start a loop for a specific command
+start_loop_for_command() {
+    local cmd="$1"
+    echo "[Supervisor] Starting loop for command: $cmd"
 
-# Initialize arrays based on dynamic number of commands
-shutdown_flags=()
-child_pids=()
-delays=()
+    (
+        while true; do
+            echo "[Supervisor] Executing: $cmd"
+            setsid bash -c "$cmd" &
+            local child_pid=$!
+            wait $child_pid
+            echo "[Supervisor] Command loop ended or crashed, restarting in 5s: $cmd"
+            sleep 5
+        done
+    ) &
+    loop_pids["$cmd"]=$!
+}
 
-for ((i=0; i<${#commands[@]}; i++)); do
-    shutdown_flags+=(0)
-    child_pids+=(0)
-    delays+=(0)   # Optional: customize delays if needed
-done
-
-# Function to kill running children immediately
-kill_child_immediately() {
-    local idx=$1
-    local cpid="${child_pids[$idx]}"
-    if [ "$cpid" -ne 0 ] && kill -0 "$cpid" 2>/dev/null; then
-        echo "[Supervisor] Killing process group for script $((idx+1)) (PGID: $cpid)"
-        kill -TERM -"$cpid" 2>/dev/null
-        wait "$cpid" 2>/dev/null
+# Function to stop a running loop for a specific command
+stop_loop_for_command() {
+    local cmd="$1"
+    local loop_pid="${loop_pids[$cmd]}"
+    if [ -n "$loop_pid" ]; then
+        echo "[Supervisor] Stopping loop for command: $cmd (PID $loop_pid)"
+        kill -TERM "$loop_pid" 2>/dev/null
+        wait "$loop_pid" 2>/dev/null
+        unset loop_pids["$cmd"]
     fi
 }
 
-# Global signal handlers
-trap 'for i in "${!shutdown_flags[@]}"; do shutdown_flags[$i]=1; kill_child_immediately $i; done; echo "[Supervisor] Global stop triggered (SIGINT or SIGTERM)";' SIGINT SIGTERM SIGHUP
-
-run_script_loop() {
-    local index=$1
-    local delay="${delays[$index]:-0}"
-
-    echo "[Supervisor] Starting loop for script $((index+1)) after ${delay}s delay."
-    sleep "$delay"
-
-    while true; do
-        if [ "${shutdown_flags[$index]}" -eq 1 ]; then
-            echo "[Supervisor] Stop flag detected for script $((index+1)). Exiting loop."
-            kill_child_immediately "$index"
-            break
-        fi
-
-        local cmd="${commands[$index]}"
-        if [ -z "$cmd" ]; then
-            echo "[Supervisor] No command found for index $((index+1)). Exiting."
-            break
-        fi
-
-        echo "[Supervisor] Executing: $cmd"
-        setsid bash -c "$cmd" &
-        child_pids[$index]=$!
-
-        # Wait for completion or forced stop
-        wait "${child_pids[$index]}"
-        child_pids[$index]=0
-
-        if [ "${shutdown_flags[$index]}" -eq 1 ]; then
-            echo "[Supervisor] Stop flag detected after script completion for $((index+1))."
-            break
-        fi
-
-        echo "[Supervisor] Restarting script $((index+1)) in 5s..."
-        sleep 5
+# Global shutdown
+graceful_shutdown() {
+    echo "[Supervisor] Received termination signal, shutting down..."
+    for cmd in "${!loop_pids[@]}"; do
+        stop_loop_for_command "$cmd"
     done
+    rm -f "$pidfile"
+    exit 0
+}
+trap graceful_shutdown SIGINT SIGTERM SIGHUP
 
-    echo "[Supervisor] Loop ended for script $((index+1))."
+# Function to load desired commands from config
+load_desired_commands() {
+    mapfile -t desired_cmds < <(grep "^$CRAWLER_ID:" commands.conf | cut -d':' -f2-)
 }
 
-# Start all loops in parallel
-for i in "${!commands[@]}"; do
-    run_script_loop "$i" &
+# Watcher loop to detect changes and reconcile
+watcher_loop() {
+    while true; do
+        load_desired_commands
+
+        # Start new commands
+        for cmd in "${desired_cmds[@]}"; do
+            if [ -z "${loop_pids[$cmd]}" ]; then
+                echo "[Watcher] New command detected: $cmd"
+                start_loop_for_command "$cmd"
+            fi
+        done
+
+        # Stop removed commands
+        for existing_cmd in "${!loop_pids[@]}"; do
+            if ! printf '%s\n' "${desired_cmds[@]}" | grep -Fxq "$existing_cmd"; then
+                echo "[Watcher] Command removed from config: $existing_cmd"
+                stop_loop_for_command "$existing_cmd"
+            fi
+        done
+
+        sleep 15  # Check every 15 seconds (adjustable)
+    done
+}
+
+# Initial load and start watcher
+load_desired_commands
+for cmd in "${desired_cmds[@]}"; do
+    start_loop_for_command "$cmd"
 done
 
+watcher_loop &
+
+# Wait for background processes
 wait
 
-echo "[Supervisor] All loops ended. Cleaning up."
+echo "[Supervisor] All done, exiting."
 rm -f "$pidfile"
