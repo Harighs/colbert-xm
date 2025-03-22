@@ -29,14 +29,14 @@ run_script_loop() {
         if [ "${shutdown_flags[$index]}" -eq 1 ]; then
             echo "[Supervisor] Stop flag detected for script $((index+1)). Exiting loop."
             if [ "$child_pid" -ne 0 ] && kill -0 "$child_pid" 2>/dev/null; then
-                echo "[Supervisor] Killing active child process $child_pid"
-                kill -SIGTERM "$child_pid"
+                echo "[Supervisor] Killing process group for child PID $child_pid"
+                kill -TERM -"$child_pid" 2>/dev/null
                 wait "$child_pid"
             fi
             break
         fi
 
-        # Dynamically load current command from config file
+        # Dynamically load command
         cmd=$(sed -n "$((index + 1))p" commands.conf)
         if [ -z "$cmd" ]; then
             echo "[Supervisor] No command found for script $((index+1)) in commands.conf, skipping."
@@ -44,7 +44,7 @@ run_script_loop() {
         fi
 
         echo "[Supervisor] Executing script $((index+1)): $cmd"
-        eval "$cmd" &
+        setsid bash -c "$cmd" &
         child_pid=$!
 
         # Wait for completion or forced shutdown
@@ -63,12 +63,3 @@ run_script_loop() {
     echo "[Supervisor] Loop ended for script $((index+1))."
 }
 
-# Start all loops in parallel
-for i in {0..2}; do
-    run_script_loop "$i" &
-done
-
-wait
-
-echo "[Supervisor] All scripts stopped. Cleaning up."
-rm -f "$pidfile"
