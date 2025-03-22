@@ -1,27 +1,30 @@
 #!/bin/bash
 
-# Function to get orchestrations supervisor PID
+pidfile="orchestrations.pid"
+
 get_orchestration_pid() {
-    pgrep -f "bash ./orchestrations.sh" | head -n 1
+    if [ -f "$pidfile" ]; then
+        cat "$pidfile"
+    else
+        echo ""
+    fi
 }
 
-# Function to print usage
 print_help() {
     echo "Usage:"
-    echo "  ./orchestrations_control.sh stop-all     # Gracefully stop all scripts"
-    echo "  ./orchestrations_control.sh stop <id>    # Gracefully stop script with ID (1, 2, or 3)"
-    echo "  ./orchestrations_control.sh status       # Show supervisor and running processes"
+    echo "  ./orchestrations_control.sh stop-all     # Stop all scripts after current iteration"
+    echo "  ./orchestrations_control.sh stop <id>    # Stop script with ID (1, 2, or 3)"
+    echo "  ./orchestrations_control.sh status       # Show supervisor and child processes"
 }
 
-# Parse arguments
 case "$1" in
     stop-all)
         orchestration_pid=$(get_orchestration_pid)
         if [ -z "$orchestration_pid" ]; then
-            echo "No running orchestrations supervisor found."
+            echo "No running supervisor found."
             exit 1
         fi
-        echo "Sending SIGINT to orchestrations supervisor (PID: $orchestration_pid) to stop all scripts..."
+        echo "Sending SIGINT to supervisor PID $orchestration_pid (stop all)..."
         kill -SIGINT "$orchestration_pid"
         ;;
     stop)
@@ -32,7 +35,7 @@ case "$1" in
         fi
         orchestration_pid=$(get_orchestration_pid)
         if [ -z "$orchestration_pid" ]; then
-            echo "No running orchestrations supervisor found."
+            echo "No running supervisor found."
             exit 1
         fi
         case "$2" in
@@ -56,11 +59,11 @@ case "$1" in
     status)
         orchestration_pid=$(get_orchestration_pid)
         if [ -z "$orchestration_pid" ]; then
-            echo "No orchestrations supervisor is currently running."
+            echo "Supervisor not running."
         else
-            echo "Orchestrations supervisor running with PID: $orchestration_pid"
+            echo "Supervisor PID: $orchestration_pid"
             echo "Process tree:"
-            ps -f --forest --ppid "$orchestration_pid"
+            pstree -p "$orchestration_pid" || ps -f --forest --ppid "$orchestration_pid"
         fi
         ;;
     *)
