@@ -12,16 +12,16 @@ get_orchestration_pid() {
 
 print_help() {
     echo "Usage:"
-    echo "  ./orchestrations_control.sh stop-all     # Stop all scripts after current iteration"
-    echo "  ./orchestrations_control.sh stop <id>    # Stop script with ID (1, 2, or 3)"
-    echo "  ./orchestrations_control.sh status       # Show supervisor and child processes"
+    echo "  ./orchestrations_control.sh stop-all     # Stop all running scripts after current iteration"
+    echo "  ./orchestrations_control.sh stop <id>    # Stop specific script by ID (1, 2, or 3)"
+    echo "  ./orchestrations_control.sh status       # Show supervisor PID and active processes"
 }
 
 case "$1" in
     stop-all)
         orchestration_pid=$(get_orchestration_pid)
         if [ -z "$orchestration_pid" ]; then
-            echo "No running supervisor found."
+            echo "No running orchestration supervisor found."
             exit 1
         fi
         echo "Sending SIGINT to supervisor PID $orchestration_pid (stop all)..."
@@ -35,7 +35,7 @@ case "$1" in
         fi
         orchestration_pid=$(get_orchestration_pid)
         if [ -z "$orchestration_pid" ]; then
-            echo "No running supervisor found."
+            echo "No running orchestration supervisor found."
             exit 1
         fi
         case "$2" in
@@ -63,7 +63,11 @@ case "$1" in
         else
             echo "Supervisor PID: $orchestration_pid"
             echo "Process tree:"
-            pstree -p "$orchestration_pid" || ps -f --forest --ppid "$orchestration_pid"
+            if command -v pstree >/dev/null 2>&1; then
+                pstree -p "$orchestration_pid"
+            else
+                ps -f --forest --ppid "$orchestration_pid"
+            fi
         fi
         ;;
     *)
