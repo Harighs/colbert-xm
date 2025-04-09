@@ -20,7 +20,7 @@ spec:
         - containerPort: 6334
         volumeMounts:
         - name: qdrant-data
-          mountPath: /qdrant/snapshots  # Path inside container
+          mountPath: /qdrant/snapshots
         resources:
           requests:
             memory: "512Mi"
@@ -42,6 +42,5 @@ spec:
           periodSeconds: 10
       volumes:
       - name: qdrant-data
-        hostPath:
-          path: /mnt/data/qdrant  # <-- Host path
-          type: DirectoryOrCreate  # Will auto-create if not existing
+        persistentVolumeClaim:
+          claimName: qdrant-pvc
