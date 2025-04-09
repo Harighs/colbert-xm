@@ -1,46 +1,101 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "4"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"qdrant","namespace":"default"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"qdrant"}},"template":{"metadata":{"labels":{"app":"qdrant"}},"spec":{"containers":[{"image":"qdrant/qdrant:v1.13.3","livenessProbe":{"httpGet":{"path":"/health","port":6333},"initialDelaySeconds":10,"periodSeconds":10},"name":"qdrant","ports":[{"containerPort":6333},{"containerPort":6334}],"readinessProbe":{"httpGet":{"path":"/health","port":6333},"initialDelaySeconds":5,"periodSeconds":10},"resources":{"limits":{"cpu":"1","memory":"2Gi"},"requests":{"cpu":"500m","memory":"512Mi"}},"volumeMounts":[{"mountPath":"/qdrant/snapshots","name":"qdrant-data"}]}],"volumes":[{"name":"qdrant-data","persistentVolumeClaim":{"claimName":"qdrant-pvc"}}]}}}}
+  creationTimestamp: "2025-04-06T18:10:42Z"
+  generation: 5
   name: qdrant
+  namespace: default
+  resourceVersion: "1191816"
+  uid: d7e6e1d1-4245-4c13-80e7-a96706330b8e
 spec:
+  progressDeadlineSeconds: 600
   replicas: 1
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       app: qdrant
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
   template:
     metadata:
+      creationTimestamp: null
       labels:
         app: qdrant
     spec:
       containers:
-      - name: qdrant
-        image: qdrant/qdrant:v1.13.3
-        ports:
-        - containerPort: 6333
-        - containerPort: 6334
-        volumeMounts:
-        - name: qdrant-data
-          mountPath: /qdrant/snapshots
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "2Gi"
-            cpu: "1"
+      - image: qdrant/qdrant:v1.13.3
+        imagePullPolicy: IfNotPresent
         livenessProbe:
+          failureThreshold: 3
           httpGet:
             path: /health
             port: 6333
+            scheme: HTTP
           initialDelaySeconds: 10
           periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: qdrant
+        ports:
+        - containerPort: 6333
+          protocol: TCP
+        - containerPort: 6334
+          protocol: TCP
         readinessProbe:
+          failureThreshold: 3
           httpGet:
             path: /health
             port: 6333
+            scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "1"
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /qdrant/snapshots
+          name: qdrant-data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
       volumes:
       - name: qdrant-data
         persistentVolumeClaim:
           claimName: qdrant-pvc
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2025-04-06T18:13:33Z"
+    lastUpdateTime: "2025-04-06T18:13:33Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-04-09T12:53:16Z"
+    lastUpdateTime: "2025-04-09T12:53:16Z"
+    message: ReplicaSet "qdrant-78487fb64b" has timed out progressing.
+    reason: ProgressDeadlineExceeded
+    status: "False"
+    type: Progressing
+  observedGeneration: 5
+  readyReplicas: 1
+  replicas: 2
+  unavailableReplicas: 1
+  updatedReplicas: 1
