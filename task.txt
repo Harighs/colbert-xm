@@ -1,0 +1,364 @@
+
+```bash
+import math
+
+# Step 1: User-defined datatype (2D Point)
+class MyPoint:
+    def __init__(self, x=0, y=0):
+        self.x = x
+        self.y = y
+
+    def distance_from_origin(self):
+        return math.sqrt(self.x**2 + self.y**2)
+
+    def distance_to(self, other):
+        dx = self.x - other.x
+        dy = self.y - other.y
+        return math.sqrt(dx**2 + dy**2)
+
+    def scale(self, factor):
+        return MyPoint(self.x * factor, self.y * factor)
+
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+
+# Step 2: Base class
+class Geometry:
+    def __init__(self, p1: MyPoint, p2: MyPoint):
+        self.p1 = p1
+        self.p2 = p2
+
+    def show_points(self):
+        print("Point A:", self.p1)
+        print("Point B:", self.p2)
+
+    def compute_distance(self):
+        return self.p1.distance_to(self.p2)
+
+# Step 3: Inherited class with method overriding + new methods
+class AdvancedGeometry(Geometry):
+    def compute_distance(self):  # Overriding (polymorphism)
+        d = super().compute_distance()
+        return round(d, 3)
+
+    def midpoint(self):
+        mx = (self.p1.x + self.p2.x) / 2
+        my = (self.p1.y + self.p2.y) / 2
+        return MyPoint(mx, my)
+
+    def scale_points(self, factor):
+        self.p1 = self.p1.scale(factor)
+        self.p2 = self.p2.scale(factor)
+
+# Step 4: Create variables and simulate
+a = MyPoint(3, 4)
+b = MyPoint(7, 1)
+
+obj = AdvancedGeometry(a, b)
+
+obj.show_points()
+print("Distance Between A and B:", obj.compute_distance())
+
+mid = obj.midpoint()
+print("Midpoint:", mid)
+
+obj.scale_points(2)
+print("Scaled Points:")
+obj.show_points()
+
+```
+
+Output:
+
+```bash
+Point A: (3, 4)
+Point B: (7, 1)
+Distance Between A and B: 5.0
+Midpoint: (5.0, 2.5)
+Scaled Points:
+Point A: (6, 8)
+Point B: (14, 2)
+```
+
+### 🧠 Evaluation of OOP Concepts:
+
+| Concept                     | Applied in Code? | How?                                                                   |
+| --------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| **Encapsulation**           | ✅                | `MyPoint` hides `x`, `y` data with methods to operate on them          |
+| **Inheritance**             | ✅                | `AdvancedGeometry` inherits from `Geometry`                            |
+| **Polymorphism**            | ✅                | `compute_distance()` is overridden with `round()` in child class       |
+| **Constructor Overloading** | ✅                | `MyPoint` allows default values (`x=0, y=0`) for flexibility           |
+| **Abstraction**             | ✅                | `MyPoint` provides clean interfaces like `distance_to()` and `scale()` |
+
+```bash
+import math
+
+# Step 1: User-defined 3D Vector
+class MyVector3D:
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def magnitude(self):
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y + self.z * other.z
+
+    def angle_with(self, other):
+        dot_product = self.dot(other)
+        mag_self = self.magnitude()
+        mag_other = other.magnitude()
+        cos_theta = dot_product / (mag_self * mag_other)
+        return math.degrees(math.acos(cos_theta))
+
+    def __str__(self):
+        return f"<{self.x}, {self.y}, {self.z}>"
+
+# Step 2: Base Class
+class VectorBase:
+    def __init__(self, v1: MyVector3D, v2: MyVector3D):
+        self.v1 = v1
+        self.v2 = v2
+
+    def show_vectors(self):
+        print("Vector A:", self.v1)
+        print("Vector B:", self.v2)
+
+# Step 3: Derived Class
+class VectorOps(VectorBase):
+    def compute_magnitudes(self):
+        return self.v1.magnitude(), self.v2.magnitude()
+
+    def compute_dot_product(self):
+        return self.v1.dot(self.v2)
+
+    def compute_angle(self):
+        return round(self.v1.angle_with(self.v2), 2)
+
+# Step 4: Run operations
+a = MyVector3D(3, 4, 0)
+b = MyVector3D(5, 0, 0)
+
+obj = VectorOps(a, b)
+
+obj.show_vectors()
+
+mag1, mag2 = obj.compute_magnitudes()
+dot = obj.compute_dot_product()
+angle = obj.compute_angle()
+
+print("\nMagnitude of A:", round(mag1, 2))
+print("Magnitude of B:", round(mag2, 2))
+print("Dot Product   :", dot)
+print("Angle Between :", angle, "degrees")
+
+```
+
+Solutions:
+
+```bash
+Vector A: <3, 4, 0>
+Vector B: <5, 0, 0>
+
+Magnitude of A: 5.0
+Magnitude of B: 5.0
+Dot Product   : 15
+Angle Between : 53.13 degrees
+```
+
+
+```bash
+# Step 1: User-defined data type
+class State:
+    def __init__(self, name, status="inactive"):
+        self.name = name
+        self.status = status
+
+    def set_status(self, new_status):
+        self.status = new_status
+
+    def __str__(self):
+        return f"{self.name}: {self.status}"
+
+# Step 2: Base transition class
+class Transition:
+    def __init__(self, state: State):
+        self.state = state
+
+    def perform(self):
+        raise NotImplementedError("Subclasses must implement perform()")
+
+# Step 3: Specific transition types (Inheritance + Polymorphism)
+class Activate(Transition):
+    def perform(self):
+        self.state.set_status("active")
+
+class Deactivate(Transition):
+    def perform(self):
+        self.state.set_status("inactive")
+
+class Reset(Transition):
+    def perform(self):
+        self.state.set_status("reset")
+
+# Step 4: Transition Manager (Composition)
+class StateManager:
+    def __init__(self):
+        self.transitions = []
+
+    def add(self, transition: Transition):
+        self.transitions.append(transition)
+
+    def run(self):
+        for i, t in enumerate(self.transitions, 1):
+            t.perform()
+            print(f"Transition {i}: {t.state}")
+
+# Step 5: Create states and transitions
+a = State("A")
+b = State("B")
+c = State("C")
+
+t1 = Activate(a)
+t2 = Deactivate(b)
+t3 = Reset(c)
+
+manager = StateManager()
+manager.add(t1)
+manager.add(t2)
+manager.add(t3)
+
+manager.run()
+```
+
+Solutions:
+```bash
+Transition 1: A: active
+Transition 2: B: inactive
+Transition 3: C: reset
+```
+
+
+### **Q### **Q1. Codebase Comprehension & Modular Refactor Strategy**
+
+> **"You're working on a 50 to 100 lines - of Python codebase that lacks documentation and is partially monolithic. You’ve been tasked find a bug the `user management module`. How would you approach understanding, refactoring, and testing this module?"**
+
+Note From Hari:
+- Do you actively run the codebase and see the output
+- Do you proceed via active debugging and solve it
+- Do you Read the code base and figure out problematic module
+- Or Other other ways ??
+Explain your answers 
+
+✅ **Answer Points:**
+- Run the code to reproduce the issue and understand context
+- Add minimal logging or use a debugger to trace execution
+- Isolate `user management` logic into a function/class if it’s mixed
+- Write unit tests around buggy behavior to lock expected output
+- Refactor only after tests pass, following single-responsibility principle
+
+### **Q2. Tokenization & Vector DB Purpose**
+
+> **"What is tokenization in NLP, and why is it important? What role does a vector database play in AI systems? Can you also list 3 tasks where vector DBs are crucial?"**
+
+Answer from Hari:
+Key Use of VecDB:
+- Future way of storing data in numerical form + withholding semantic with or without linguistic bias
+- store and retrieve data in disk and seamless retrieval speed on demand with (basic to complex similarity search)
+- Domain in-specific eg. Single DB can contain Document, Image, Video all at single DB relations in general*
+
+✅ **Answer Points:**
+- **Tokenization:** Splits text into units (words, subwords) for model consumption
+- **Importance:** Models can't interpret raw text; tokenization defines input structure
+- **Vector DB Role:** Stores high-dimensional embeddings for fast similarity search
+- **3 Key Tasks:**
+    - Semantic document search
+    - Chatbot memory retrieval
+    - Product or recommendation matching
+
+### **Q3. Model Accuracy vs Precision**
+
+> **"You train a classification model and it shows high accuracy but very low precision. What does this mean? What might be going wrong?"**
+
+Answer from Hari:
+Simple question Below is answer 
+
+✅ **Answer Points:**
+
+- Model is predicting **too many positives**, including **false positives**
+    
+- Likely **class imbalance** or poor threshold tuning
+    
+- Accuracy is inflated due to dominance of majority class
+    
+- Should focus on **F1 score** and adjust thresholds or sampling strategy
+
+### **Q4. Debugging NLP Model Weakness**
+
+> **"Your chatbot gives good responses for general queries but fails for domain-specific terms (e.g., medical or legal). What might be going wrong and how would you improve it?"**
+
+Answer form Hari: 
+- Any good problem Solving skills from candidate how he approach the tasks
+
+### **Q5. Embedding Model Drift in Production**
+
+> **"Your semantic search system worked well last quarter, but now users report poor Response quality. You haven’t changed your model or pipeline. What’s likely happening, and how would you detect and fix it?"**
+
+Answers from Hari:
+- Embedding drift is the cause
+- Isolate and evaluate new data immediately from Production
+- Metrices:
+	- Data Extraction quality
+	- Comparing the Centroids
+	- Do PCA - Principle Component analysis for both older and newer data
+	- KL - Divergence
+
+✅ **Answer from academic understanding:**
+- **Cause:** **Embedding drift** — newer data entering the system has different vocabulary/distribution.
+- **Detection:** Monitor **cosine similarity distribution**, track **query relevance scores**, perform **embedding alignment tests**.
+- **Fix:** Periodic retraining, active learning, or **domain adaptation** using updated corpora.
+
+### **Q6. Underfitting or Data Leakage?**
+
+> **"You train a transformer-based model and observe **50% accuracy on training** but **98% on validation**. What could be going wrong, and how would you investigate it?"**
+
+Answer from Hari:
+- Reason : data leakage if not:
+- Mix up the data and split it again if possible
+- Do a Cross Validation method to evaluate the results
+
+**Answer Points:**
+- Likely **data leakage**: validation set overlaps with training features or labels
+- Check if data is normalized
+- Validate **splitting logic** and label alignment
+### **Q7. Advanced Information Retrieval Architecture Thinking**
+
+> **"You’ve implemented a dense retrieval system using sentence embeddings and cosine similarity against a vector store. The system returns results, but user feedback indicates that relevance is inconsistent — especially with domain-specific, long, or ambiguous queries.**
+> 
+> As an engineer responsible for **retrieval quality**, outline how you would re-architect or enhance the pipeline to improve retrieval performance. Your solution should not involve retraining / fine tuning the model at this stage."**
+
+**Answer from Hari**
+- Pre - Post processing, (Reranking (or) Multistage RAG)
+- Classify the query and search in multi domain of interests (Bringing Artificial Consciousness to pipeline) and select top-k again from retrieved domains
+
+✅ **Answer Points:**
+- Use **multi-stage retrieval**: BM25 + dense
+- Add **cross-encoder re-ranking** for semantic scoring
+- Improve **query pre-processing**: keyword expansion, normalization
+
+## Behavioural Question 
+
+1. Tell me about some of most difficult problems you worked on and how you solved them
+2. The "Tough Problems" Lie Detector
+   **Question:**  
+   “*Tell me about some of the most difficult problems you worked on and how you solved them.*”
+   **Musk’s Follow-Up:**
+	- _“What specific metrics did you track?”_
+	- _“How did you isolate the thermal flaw?”_
+	- _“What alternative solutions did you reject, and why?”_
+3. _“Do you believe or have experienced apply principles from [unrelated field, e.g., biology] to improve [specific product, e.g., battery efficiency]?”_
+   eg. A process of DNA Formation Procedures would possibly solve your information retrieval system issue
+
+1000000000
